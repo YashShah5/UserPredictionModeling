@@ -7,6 +7,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
 from xgboost import XGBClassifier
 
+import psycopg2
+
 # Load dataset
 data = pd.read_csv("Dataset_2.csv")
 
@@ -17,6 +19,125 @@ data.dropna(inplace=True)  # Drop missing values if any
 print(data.info())
 
 # Example Data Cleaning (if needed)
+
+# PostgreSQL Database Setup
+def create_database_connection():
+    conn = psycopg2.connect(
+        dbname="churn_analysis",
+        user="final",
+        password="project",
+        host="localhost",
+        port="5432"
+    )
+    return conn
+
+def create_tables(conn):
+    cur = conn.cursor()
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS customer_profiles (
+        customer_id SERIAL PRIMARY KEY,
+        age INT,
+        location TEXT,
+        
+        payment_method TEXT,
+        subscription_type TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_history (
+        subscription_id SERIAL PRIMARY KEY,
+        customer_id INT REFERENCES customer_profiles(customer_id),
+        payment_plan TEXT,
+        num_subscription_pauses INT,
+        signup_date DATE
+    );
+
+    CREATE TABLE IF NOT EXISTS engagement_data (
+        engagement_id SERIAL PRIMARY KEY,
+        customer_id INT REFERENCES customer_profiles(customer_id),
+        weekly_hours FLOAT,
+        average_session_length FLOAT,
+        song_skip_rate FLOAT,
+        weekly_songs_played INT,
+        churned BOOLEAN
+    );
+    """)
+    conn.commit()
+    cur.close()
+
+def populate_tables(conn, data):
+    cur = conn.cursor()
+    import datetime
+
+    for _, row in data.iterrows():
+        # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
+        signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
+        churned = bool(row['churned'])  # Convert churned to boolean explicitly
+        # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
+        signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
+
+        cur.execute(
+            """
+            INSERT INTO customer_profiles (age, location, payment_method, subscription_type)
+            VALUES (%s, %s, %s, %s) RETURNING customer_id;
+            """,
+            (row['age'], row['location'], row['payment_method'], row['subscription_type'])
+        )
+        customer_id = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            INSERT INTO subscription_history (customer_id, payment_plan, num_subscription_pauses, signup_date)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (customer_id, row['payment_plan'], row['num_subscription_pauses'], signup_date)
+        )
+
+        cur.execute(
+            """
+            INSERT INTO engagement_data (customer_id, weekly_hours, average_session_length, song_skip_rate,
+                                         weekly_songs_played, churned)
+            VALUES (%s, %s, %s, %s, %s, bool(bool(row['churned'])));
+            """,
+            (customer_id, row['weekly_hours'], row['average_session_length'], row['song_skip_rate'],
+             row['weekly_songs_played'], bool(row['churned']))
+        )
+        # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
+        signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
+    for _, row in data.iterrows():
+        cur.execute(
+            """
+            INSERT INTO customer_profiles (age, location, payment_method, subscription_type)
+            VALUES (%s, %s, %s, %s) RETURNING customer_id;
+            """,
+            (row['age'], row['location'], row['payment_method'], row['subscription_type'])
+        )
+        customer_id = cur.fetchone()[0]
+
+        cur.execute(
+            """
+            INSERT INTO subscription_history (customer_id, payment_plan, num_subscription_pauses, signup_date)
+            VALUES (%s, %s, %s, %s);
+            """,
+            (customer_id, row['payment_plan'], row['num_subscription_pauses'], row['signup_date'])
+        )
+
+        cur.execute(
+            """
+            INSERT INTO engagement_data (customer_id, weekly_hours, average_session_length, song_skip_rate,
+                                         weekly_songs_played, churned)
+            VALUES (%s, %s, %s, %s, %s, %s);
+            """,
+            (customer_id, row['weekly_hours'], row['average_session_length'], row['song_skip_rate'],
+             row['weekly_songs_played'], bool(row['churned']))
+        )
+    conn.commit()
+    cur.close()
+
+# Initialize and populate the database
+conn = create_database_connection()
+create_tables(conn)
+populate_tables(conn, data)
+conn.close()
 # MonthlyCharges column not present in dataset, skipping this step
 # TotalCharges column not present in dataset, skipping this step
 data.dropna(inplace=True)
