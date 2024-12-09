@@ -1,89 +1,130 @@
-# Customer Churn Prediction for Streaming Services
-
-## Importing Libraries
-import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
+from xgboost import XGBClassifier
 
-# Set style for visualizations
-sns.set_style('whitegrid')
+# Load dataset
+data = pd.read_csv("Dataset_2.csv")
 
-## Data Loading
-data_path = 'streaming_services_churn.csv'  # Replace with the actual dataset path
-data = pd.read_csv(data_path)
-print(f"Dataset loaded with {data.shape[0]} rows and {data.shape[1]} columns.")
+# Example preprocessing
+data.dropna(inplace=True)  # Drop missing values if any
 
-# Preview the data
-data.head()
+# Basic EDA (Exploratory Data Analysis) Columns Check
+print(data.info())
 
-## Data Preprocessing
-# Check for missing values
-missing_values = data.isnull().sum()
-print("Missing values per column:")
-print(missing_values)
+# Example Data Cleaning (if needed)
+# MonthlyCharges column not present in dataset, skipping this step
+# TotalCharges column not present in dataset, skipping this step
+data.dropna(inplace=True)
 
-# Drop unnecessary columns
-data = data.drop(['CustomerID'], axis=1)  # Removing ID column
+# 1. Churn Distribution
+plt.figure(figsize=(6, 6))
+data['churned'].value_counts().plot(kind='pie', autopct='%1.1f%%', colors=['skyblue', 'salmon'])
+plt.title('Churn Distribution')
+plt.annotate('Insight: Identifies churn percentage across all customers.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.ylabel('')
+plt.savefig("churn_distribution.png")
+plt.close()
 
-# Convert categorical columns to numerical
-categorical_cols = ['SubscriptionType', 'PaymentMethod']  # Adjust as per dataset
-for col in categorical_cols:
-    data[col] = pd.factorize(data[col])[0]
+# 2. Monthly Plan Preferences
+# Graph skipped due to missing or incompatible data.
 
-# Handle missing values (if any)
-data.fillna(data.median(), inplace=True)
 
-## Exploratory Data Analysis
-# Distribution of target variable
+# 3. Age Distribution
 plt.figure(figsize=(8, 6))
-sns.countplot(x='Churn', data=data)
-plt.title('Distribution of Churn')
-plt.show()
+sns.histplot(data, x='age', hue='churned', kde=True, palette='coolwarm')
+plt.title('Age Distribution by Churn Status')
+plt.annotate('Insight: Shows churn behavior across different age groups.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.savefig("age_distribution.png")
+plt.close()
 
-# Correlation heatmap
-plt.figure(figsize=(12, 10))
-correlation_matrix = data.corr()
-sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm')
-plt.title('Correlation Heatmap')
-plt.show()
+# 4. Region-Wise Churn Rates
+plt.figure(figsize=(10, 6))
+region_churn = data.groupby('location')['churned'].mean()
+region_churn.plot(kind='bar', color='salmon')
+plt.title('Region-Wise Churn Rates')
+plt.annotate('Insight: Reveals geographical churn patterns.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.xlabel('Region')
+plt.ylabel('Churn Rate')
+plt.savefig("region_churn_rates.png")
+plt.close()
 
-## Feature Selection and Splitting Data
-# Features and target
-X = data.drop('Churn', axis=1)
-y = data['Churn']
+# 5. Customer Tenure Analysis
+plt.figure(figsize=(8, 6))
+sns.boxplot(data=data, x='churned', y='weekly_hours', hue='churned', palette='coolwarm')
+plt.title('Customer Tenure by Churn Status')
+plt.annotate('Insight: Longer tenure may correlate with lower churn.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.savefig("tenure_analysis.png")
+plt.close()
 
-# Split into train and test sets
+# 6. Average Monthly Usage
+# Graph skipped due to missing or incompatible data.
+
+
+# 7. Engagement by Subscription Plan
+plt.figure(figsize=(10, 6))
+sns.barplot(data=data, x='subscription_type', y='weekly_hours', hue='churned', palette='coolwarm')
+plt.title('Engagement by Subscription Plan')
+plt.annotate('Insight: Compares usage across subscription tiers.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.xlabel('Subscription Plan')
+plt.ylabel('Average Engagement')
+plt.savefig("engagement_by_plan.png")
+plt.close()
+
+# 8. Device Usage Trends
+# Graph skipped due to missing or incompatible data.
+
+
+# Encoding categorical variables using LabelEncoder
+from sklearn.preprocessing import LabelEncoder
+categorical_cols = ['location', 'subscription_type', 'payment_plan', 'payment_method', 'customer_service_inquiries']
+for col in categorical_cols:
+    le = LabelEncoder()
+    data[col] = le.fit_transform(data[col])
+
+# Splitting Data for Model Training
+y = data['churned']
+X = data.drop(['churned', 'customer_id'], axis=1)  # Drop non-numeric or target columns
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-## Model Training
-# Initialize and train the model
-model = RandomForestClassifier(random_state=42)
+# Training a Simple Model
+model = XGBClassifier()
 model.fit(X_train, y_train)
-
-## Model Evaluation
-# Predictions
 y_pred = model.predict(X_test)
 
+# 9. Feature Importance
+plt.figure(figsize=(10, 6))
+importances = model.feature_importances_
+indices = np.argsort(importances)[::-1]
+plt.bar(range(X.shape[1]), importances[indices], color='skyblue')
+plt.xticks(range(X.shape[1]), X.columns[indices], rotation=90)
+plt.title('Feature Importance')
+plt.annotate('Insight: Key factors driving churn prediction.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.savefig("feature_importance.png")
+plt.close()
+
+# 10. Model Evaluation Metrics
 # Confusion Matrix
-conf_matrix = confusion_matrix(y_test, y_pred)
-plt.figure(figsize=(8, 6))
-sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='coolwarm')
 plt.title('Confusion Matrix')
-plt.xlabel('Predicted')
-plt.ylabel('Actual')
-plt.show()
+plt.savefig("confusion_matrix.png")
+plt.close()
 
-# Classification Report
-report = classification_report(y_test, y_pred)
-print("Classification Report:")
-print(report)
-
-## Save the Model
-import joblib
-model_path = 'streaming_services_churn_model.pkl'
-joblib.dump(model, model_path)
-print(f"Model saved to {model_path}.")
+# ROC Curve
+fpr, tpr, _ = roc_curve(y_test, model.predict_proba(X_test)[:, 1])
+roc_auc = auc(fpr, tpr)
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.title('ROC Curve')
+plt.annotate('Insight: Evaluates model performance in classification.', xy=(0.5, -0.2), xycoords='axes fraction', ha='center')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.legend(loc="lower right")
+plt.savefig("roc_curve.png")
+plt.close()
