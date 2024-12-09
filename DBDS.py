@@ -22,6 +22,7 @@ print(data.info())
 
 # PostgreSQL Database Setup
 def create_database_connection():
+    print("Connecting to PostgreSQL database...")
     conn = psycopg2.connect(
         dbname="churn_analysis",
         user="final",
@@ -29,6 +30,7 @@ def create_database_connection():
         host="localhost",
         port="5432"
     )
+    print("Connection successful!")
     return conn
 
 def create_tables(conn):
@@ -72,8 +74,6 @@ def populate_tables(conn, data):
         # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
         signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
         churned = bool(row['churned'])  # Convert churned to boolean explicitly
-        # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
-        signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
 
         cur.execute(
             """
@@ -96,41 +96,14 @@ def populate_tables(conn, data):
             """
             INSERT INTO engagement_data (customer_id, weekly_hours, average_session_length, song_skip_rate,
                                          weekly_songs_played, churned)
-            VALUES (%s, %s, %s, %s, %s, bool(bool(row['churned'])));
-            """,
-            (customer_id, row['weekly_hours'], row['average_session_length'], row['song_skip_rate'],
-             row['weekly_songs_played'], bool(row['churned']))
-        )
-        # Convert signup_date to DATE (assuming it's an integer offset from a reference year, e.g., 1970)
-        signup_date = datetime.date(1970, 1, 1) + datetime.timedelta(days=row['signup_date'])
-    for _, row in data.iterrows():
-        cur.execute(
-            """
-            INSERT INTO customer_profiles (age, location, payment_method, subscription_type)
-            VALUES (%s, %s, %s, %s) RETURNING customer_id;
-            """,
-            (row['age'], row['location'], row['payment_method'], row['subscription_type'])
-        )
-        customer_id = cur.fetchone()[0]
-
-        cur.execute(
-            """
-            INSERT INTO subscription_history (customer_id, payment_plan, num_subscription_pauses, signup_date)
-            VALUES (%s, %s, %s, %s);
-            """,
-            (customer_id, row['payment_plan'], row['num_subscription_pauses'], row['signup_date'])
-        )
-
-        cur.execute(
-            """
-            INSERT INTO engagement_data (customer_id, weekly_hours, average_session_length, song_skip_rate,
-                                         weekly_songs_played, churned)
             VALUES (%s, %s, %s, %s, %s, %s);
             """,
             (customer_id, row['weekly_hours'], row['average_session_length'], row['song_skip_rate'],
-             row['weekly_songs_played'], bool(row['churned']))
+             row['weekly_songs_played'], churned)
         )
+
     conn.commit()
+    cur.close()
     cur.close()
 
 # Initialize and populate the database
