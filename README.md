@@ -1,5 +1,5 @@
 
-# Churn Prediction Subscription Models
+# User Prediction Subscription Model 
 
 **Research Question:**
 
