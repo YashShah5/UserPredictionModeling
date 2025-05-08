@@ -67,9 +67,8 @@ psql --version
     source myenv/bin/activate  
 ## Authors
 
-- Yash Shah - yss28 - Section 6
-- Avinash Pushparaj - ap2148 - Section 5
-- Matej Virizlay - mlv91 - Section 5
+- Yash Shah - yss28 
+- Ritesh Reddy - rrk92
 
 
 
