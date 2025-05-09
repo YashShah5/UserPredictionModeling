@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, roc_curve, auc, precision_recall_curve
 from xgboost import XGBClassifier
 
+
 import psycopg2
 
 # Load dataset
