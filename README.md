@@ -11,7 +11,7 @@
 
 **SIRS Survey Completion & Demo Video & Project Document:**
 
-*All Team Members completed the survey & Made a video for extra credit & have a project document.*
+*Ritesh and I completed the survey & Made a video for extra credit & have a project document.*
 
 **Project Document Link:** 
 
